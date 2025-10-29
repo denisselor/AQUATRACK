@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Water Bill Tracker — Improved</title>
+  <style>
+    /* -------------------------
+       THEME & LAYOUT
+       ------------------------- */
+    :root{
+      --bg: #f4f7f9;
+      --card: #ffffff;
+      --prussian: #103A57; /* primary */
+      --teal: #307B8E;     /* accent */
+      --muted: #6b7280;
+      --glass: rgba(16,58,87,0.06);
+      --radius: 12px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+
+    *{box-sizing:border-box}
+    body{margin:0; background:var(--bg); color:var(--prussian); line-height:1.35}
+    .wrap{max-width:980px; margin:28px auto; padding:20px;}
+
+    header{display:flex; gap:16px; align-items:center; margin-bottom:18px}
+    .brand{background:linear-gradient(135deg,var(--prussian),var(--teal)); color:white; padding:10px 14px; border-radius:10px; box-shadow:0 6px 18px var(--glass);}
+    h1{font-size:20px; margin:0}
+    p.lead{margin:0; color:var(--muted); font-size:14px}
+
+    .grid{display:grid; grid-template-columns:1fr 360px; gap:18px}
+    @media (max-width:880px){.grid{grid-template-columns:1fr}}
+
+    /* Card */
+    .card{background:var(--card); padding:16px; border-radius:var(--radius); box-shadow:0 8px 18px rgba(16,58,87,0.05)}
+    .card h2{margin-top:0; color:var(--prussian)}
+
+    /* Form */
+    form{display:flex; flex-direction:column; gap:12px}
+    .row{display:flex; gap:10px}
+    .row .col{flex:1}
+    label{display:block; font-size:13px; color:var(--muted); margin-bottom:6px}
+    input[type=number]{width:100%; padding:10px 12px; border-radius:8px; border:1px solid #e6eef2; font-size:14px}
+    .controls{display:flex; gap:8px; flex-wrap:wrap}
+    button{background:var(--prussian); color:white; border:0; padding:10px 12px; border-radius:10px; cursor:pointer}
+    button.secondary{background:transparent; color:var(--prussian); border:1px solid rgba(16,58,87,0.08)}
+    button.ghost{background:transparent; color:var(--teal); border:1px dashed rgba(48,123,142,0.12)}
+
+    /* Months list */
+    #months{display:flex; flex-direction:column; gap:8px; max-height:360px; overflow:auto; padding-right:6px}
+    .month-row{display:flex; gap:8px; align-items:center}
+    .month-row input{flex:1}
+    .month-row .rm{background:#ffe9e9;color:#b03030;padding:6px 8px;border-radius:8px;border:0}
+
+    /* Result box */
+    .result{padding:12px; background:linear-gradient(180deg,#f8fafb,#ffffff); border-radius:10px; border:1px solid rgba(16,58,87,0.04)}
+    .result p{margin:6px 0}
+    .stat{font-weight:600}
+
+    /* History */
+    .history-list{display:flex; flex-direction:column; gap:8px; margin-top:8px}
+    .record{display:flex; justify-content:space-between; gap:10px; align-items:center; padding:8px; border-radius:8px; background:#fbfcfd; border:1px solid rgba(16,58,87,0.03)}
+    .record small{color:var(--muted)}
+    .record-actions button{margin-left:6px}
+
+    footer{margin-top:16px; text-align:center; color:var(--muted); font-size:13px}
+
+    /* Table when wide */
+    @media(min-width:880px){
+      .history-card{height:100%}
+    }
+
+  .logo-img {
+  width: 90%;        
+  max-width: 600px;  
+  height: auto; 
+  display: block;        
+  margin: 0 auto;  
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+  </style>
+</head>
+<body>
+    <main class="container">
+    <!-- 🖼️ Header Image -->
+    <header class="site-header">
+      <img src="logo.jpg" alt="Water Bill Tracker Header" class="logo-img">
+    </header>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <strong>Water</strong>Tracker
+      </div>
+      <div>
+        <h1>Water Bill Tracker</h1>
+        <p class="lead">Enter 3 or more monthly bills to compute averages, detect spikes, and save history.</p>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- LEFT: Calculator & Input -->
+      <section class="card">
+        <h2>Enter monthly bills</h2>
+        <form id="mainForm">
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px">
+            <label style="margin:0; font-size:13px; color:var(--muted)">Number of months (min 3)</label>
+            <input id="numMonths" type="number" min="3" value="3" style="width:80px; padding:8px; border-radius:8px; border:1px solid #e6eef2">
+            <button type="button" id="applyMonths" class="secondary">Apply</button>
+          </div>
+
+          <div id="months" aria-live="polite">
+            <!-- JS will populate month inputs here -->
+          </div>
+
+          <div style="display:flex; gap:8px; margin-top:8px" class="controls">
+            <button id="calcBtn" type="button">Calculate</button>
+            <button id="saveBtn" type="button" class="secondary">Save record</button>
+            <button id="resetBtn" type="button" class="ghost">Reset form</button>
+          </div>
+        </form>
+
+        <div style="margin-top:12px">
+          <h2>Result</h2>
+          <div class="result" id="resultBox">
+            <p id="noResult">No calculation yet. Enter bills and click Calculate.</p>
+            <div id="resultContent" style="display:none">
+              <p>Average bill: <span class="stat" id="avgVal">₱0.00</span></p>
+              <p>Biggest spike: <span class="stat" id="spikeVal">—</span></p>
+              <p>Percentage changes:</p>
+              <ul id="pctList" style="margin:6px 0 0 18px; padding:0"></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT: History & Saved Records -->
+      <aside class="card history-card">
+        <h2>Saved history</h2>
+        <div class="history-list" id="historyList"></div>
+        <div style="display:flex; gap:8px; margin-top:10px">
+          <button id="clearHistory" class="ghost">Clear all</button>
+          <button id="exportJSON" class="secondary">Export JSON</button>
+        </div>
+        <footer>
+          <small>Tip: Click "Load" on a saved record to edit or add more months, then Save to update.</small>
+        </footer>
+        <footer style="margin-top: 30px; text-align: center; color: var(--muted); font-size: 12px;">
+  <p>This website is the intellectual property of <strong>BSSE 1102 Group 1</strong> — Chem Paper Project under <strong>Batangas State University</strong>. Please do not copy or reproduce without permission.</p>
+</footer>
+      </aside>
+    </div>
+        <!-- Group Members Section (Collapsible) -->
+    <section class="card" style="margin-top: 20px;">
+      <h2>Project Team</h2>
+      <button id="toggleMembersBtn" style="background: var(--teal); color: white; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer;">
+        Show Group Members
+      </button>
+
+      <ul id="membersList" style="margin-top: 10px; padding-left: 18px; color: var(--prussian); display: none;">
+        <li>Denisse Lorraine R. Aquino — Leader / Developer</li>
+        <li>Kathleen B. Andal — Researcher</li>
+        <li>Frances Irish Asugui — Researcher</li>
+        <li>Ma. Niña Arciga — Researcher</li>
+        <li>Bea Angela Bacsa — Researcher</li>
+        <li>Benice Naomi Balbacal — Researcher</li>
+      </ul>
+    </section>
+  </div>
+
+  <script>
+    /* -------------------------
+       Simple Water Bill Tracker (Frontend-only)
+       - Uses HTML + CSS + JS
+       - Saves records to localStorage
+       - Allows 3 or more months of input
+       - Computes average (simple mean), spike detection, percent changes
+       - Save / Load / Edit / Delete history
+       ------------------------- */
+
+    // Helpers for DOM
+    const monthsContainer = document.getElementById('months');
+    const numMonthsInput = document.getElementById('numMonths');
+    const applyMonthsBtn = document.getElementById('applyMonths');
+    const calcBtn = document.getElementById('calcBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const resultBox = document.getElementById('resultBox');
+    const noResult = document.getElementById('noResult');
+    const resultContent = document.getElementById('resultContent');
+    const avgVal = document.getElementById('avgVal');
+    const spikeVal = document.getElementById('spikeVal');
+    const pctList = document.getElementById('pctList');
+    const historyList = document.getElementById('historyList');
+    const clearHistoryBtn = document.getElementById('clearHistory');
+    const exportJSONBtn = document.getElementById('exportJSON');
+
+    // State
+    let editingRecordId = null; // if user loads a record to edit
+
+    // Initialize with default number of months
+    function makeMonthInputs(n = 3, values = []){
+      monthsContainer.innerHTML = '';
+      for(let i=0;i<n;i++){
+        const row = document.createElement('div');
+        row.className = 'month-row';
+        row.innerHTML = `
+          <div style="flex:1">
+            <label>Month ${i+1} bill (₱)</label>
+            <input type="number" step="0.01" min="0" class="month-input" data-index="${i}" value="${values[i] ?? ''}" placeholder="e.g. 350.50">
+          </div>
+          <div>
+            <button class="rm" title="Remove this month">−</button>
+          </div>
+        `;
+        // Remove button behavior
+        row.querySelector('.rm').addEventListener('click', ()=>{
+          row.remove();
+          refreshMonthIndices();
+        });
+        monthsContainer.appendChild(row);
+      }
+      refreshMonthIndices();
+    }
+
+    // After removing, update indices and label text
+    function refreshMonthIndices(){
+      const rows = monthsContainer.querySelectorAll('.month-row');
+      rows.forEach((r, idx)=>{
+        r.querySelector('label').textContent = `Month ${idx+1} bill (₱)`;
+        r.querySelector('.month-input').dataset.index = idx;
+      });
+      // If less than 3 months, disable remove buttons
+      if(rows.length < 3){
+        rows.forEach(r=> r.querySelector('.rm').disabled = true);
+      } else {
+        rows.forEach(r=> r.querySelector('.rm').disabled = false);
+      }
+    }
+
+    // Read numeric values from inputs (ignore empty)
+    function readBills(){
+      const inputs = monthsContainer.querySelectorAll('.month-input');
+      const values = [];
+      inputs.forEach(inp=>{
+        const v = parseFloat(inp.value);
+        if(!isNaN(v)) values.push(v);
+      });
+      return values;
+    }
+
+    // Core calculations
+    function computeMetrics(bills){
+      // bills: array of numbers, length >= 1
+      const n = bills.length;
+      const sum = bills.reduce((s,x)=>s+x,0);
+      const avg = sum / n;
+
+      // Differences between consecutive months
+      const diffs = [];
+      for(let i=1;i<n;i++) diffs.push(bills[i] - bills[i-1]);
+
+      // Spike detection: find largest positive diff and its month
+      let spikeMonth = null; // human-readable month name like 'Month 2'
+      let spikeValNum = null;
+      if(diffs.length > 0){
+        let maxDiff = -Infinity; let maxIdx = -1;
+        for(let i=0;i<diffs.length;i++){
+          if(diffs[i] > maxDiff){ maxDiff = diffs[i]; maxIdx = i; }
+        }
+        // Only consider positive increases as a spike
+        if(maxDiff > 0){
+          spikeMonth = `Month ${maxIdx+2}`; // diffs[0] is B-A which means spike is Month2
+          spikeValNum = maxDiff;
+        }
+      }
+
+      // Percentage changes between consecutive months
+      const pct = [];
+      for(let i=1;i<n;i++){
+        const oldVal = bills[i-1];
+        const newVal = bills[i];
+        let p = null;
+        if(oldVal === 0){
+          p = newVal === 0 ? 0 : null; // null means cannot compute percent change because old is zero
+        } else {
+          p = ((newVal - oldVal) / oldVal) * 100;
+        }
+        pct.push({from:i, to:i+1, percent:p});
+      }
+
+      return {avg, spikeMonth, spikeValNum, pct, sum, n, diffs};
+    }
+
+    // UI update for results
+    function showResults(metrics){
+      noResult.style.display = 'none';
+      resultContent.style.display = 'block';
+      avgVal.textContent = `₱ ${metrics.avg.toFixed(2)}`;
+      spikeVal.textContent = metrics.spikeMonth ? `${metrics.spikeMonth} (increase ₱ ${metrics.spikeValNum.toFixed(2)})` : 'No spike (no positive increase)';
+
+      pctList.innerHTML = '';
+      if(metrics.pct.length === 0){
+        const li = document.createElement('li'); li.textContent = 'No percentage changes (need at least 2 months)'; pctList.appendChild(li);
+      } else {
+        metrics.pct.forEach(p=>{
+          const li = document.createElement('li');
+          if(p.percent === null) li.textContent = `Month ${p.from} → Month ${p.to}: Cannot compute % change (old value is 0)`;
+          else li.textContent = `Month ${p.from} → Month ${p.to}: ${p.percent.toFixed(2)}%`;
+          pctList.appendChild(li);
+        });
+      }
+    }
+
+    // Local storage helpers
+    const STORAGE_KEY = 'wb_improved_records_v1';
+    function loadHistory(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }
+    function saveHistory(records){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    }
+
+    // Render saved history list
+    function renderHistory(){
+      const records = loadHistory();
+      historyList.innerHTML = '';
+      if(records.length === 0){
+        historyList.innerHTML = '<div style="color:var(--muted);">No saved records yet.</div>';
+        return;
+      }
+      records.forEach((r, idx)=>{
+        const div = document.createElement('div');
+        div.className = 'record';
+        const meta = document.createElement('div');
+        meta.innerHTML = `<div><strong>Record ${idx+1}</strong><br><small>${new Date(r.savedAt).toLocaleString()}</small></div>`;
+        const summary = document.createElement('div');
+        summary.innerHTML = `<small>${r.bills.length} months • Avg ₱ ${r.metrics.avg.toFixed(2)}</small>`;
+        const actions = document.createElement('div'); actions.className = 'record-actions';
+        const loadBtn = document.createElement('button'); loadBtn.className='secondary'; loadBtn.textContent='Load';
+        const delBtn = document.createElement('button'); delBtn.className='ghost'; delBtn.textContent='Delete';
+        const editBtn = document.createElement('button'); editBtn.className='secondary'; editBtn.textContent='Edit';
+
+        loadBtn.addEventListener('click', ()=>{
+          // Load this record into form (append months)
+          const existing = Array.from(monthsContainer.querySelectorAll('.month-input')).map(i=>i.value).filter(v=>v!=='');
+          const merged = existing.map(x=>parseFloat(x)).filter(x=>!isNaN(x)).concat(r.bills);
+          makeMonthInputs(merged.length, merged);
+          numMonthsInput.value = merged.length;
+          editingRecordId = null; // not editing, just merged
+        });
+
+        editBtn.addEventListener('click', ()=>{
+          // Load for editing (overwrite form and set editingRecordId)
+          makeMonthInputs(r.bills.length, r.bills);
+          numMonthsInput.value = r.bills.length;
+          editingRecordId = idx; // save id so Save will update instead of creating new
+        });
+
+        delBtn.addEventListener('click', ()=>{
+          if(confirm('Delete this record?')){
+            const arr = loadHistory(); arr.splice(idx,1); saveHistory(arr); renderHistory();
+          }
+        });
+
+        actions.appendChild(loadBtn); actions.appendChild(editBtn); actions.appendChild(delBtn);
+        div.appendChild(meta); div.appendChild(summary); div.appendChild(actions);
+        historyList.appendChild(div);
+      });
+    }
+
+    // Event handlers
+    applyMonthsBtn.addEventListener('click', ()=>{
+      let n = parseInt(numMonthsInput.value) || 3;
+      if(n < 3) n = 3;
+      makeMonthInputs(n);
+    });
+
+    calcBtn.addEventListener('click', ()=>{
+      const bills = readBills();
+      if(bills.length < 3){
+        alert('Please enter at least 3 monthly bills to compute.');
+        return;
+      }
+      const metrics = computeMetrics(bills);
+      // Save lastMetrics somewhere so Save button can use it
+      window.lastMetrics = metrics;
+      window.lastBills = bills;
+      showResults(metrics);
+    });
+
+    saveBtn.addEventListener('click', ()=>{
+      const bills = readBills();
+      if(bills.length < 1){ alert('No bill values to save.'); return; }
+      const metrics = computeMetrics(bills);
+      const records = loadHistory();
+      const recordObj = { savedAt: new Date().toISOString(), bills, metrics };
+      if(editingRecordId !== null && records[editingRecordId]){
+        // Update existing record
+        records[editingRecordId] = recordObj;
+        editingRecordId = null;
+      } else {
+        // Add new record to start
+        records.unshift(recordObj);
+      }
+      saveHistory(records);
+      renderHistory();
+      alert('Record saved. You can Load or Edit it from the Saved history panel.');
+    });
+
+    resetBtn.addEventListener('click', ()=>{
+      if(confirm('Reset the form and remove all inputs?')){
+        numMonthsInput.value = 3; makeMonthInputs(3); noResult.style.display='block'; resultContent.style.display='none';
+        editingRecordId = null;
+      }
+    });
+
+    clearHistoryBtn.addEventListener('click', ()=>{
+      if(confirm('Clear all saved records?')){
+        localStorage.removeItem(STORAGE_KEY); renderHistory();
+      }
+    });
+
+    exportJSONBtn.addEventListener('click', ()=>{
+      const records = loadHistory();
+      const blob = new Blob([JSON.stringify(records, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'water_records.json';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
+
+    // Initial UI
+    makeMonthInputs(3);
+    renderHistory();
+
+    // Keyboard: press Enter while focused in an input to calculate
+    monthsContainer.addEventListener('keydown', (e)=>{
+      if(e.key === 'Enter'){
+        e.preventDefault(); calcBtn.click();
+      }
+    });
+    // Group Members Toggle Button
+const toggleMembersBtn = document.getElementById("toggleMembersBtn");
+const membersList = document.getElementById("membersList");
+
+toggleMembersBtn.addEventListener("click", () => {
+  if (membersList.style.display === "none") {
+    membersList.style.display = "block";
+    toggleMembersBtn.textContent = "Hide Group Members";
+  } else {
+    membersList.style.display = "none";
+    toggleMembersBtn.textContent = "Show Group Members";
+  }
+});
+
+  </script>
+</body>
+</html>
